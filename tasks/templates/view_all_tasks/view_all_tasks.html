@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ver todas terefas</title>
+</head>
+<body>
+    <ul id="listTask">
+
+    </ul>
+    <br>
+
+    <form action="." method="post" id="adicionarTarefa">
+        {% csrf_token %}
+        <h1>Adicionar tarefa</h1>
+        <label for="ititle">Titulo: </label>
+        <input type="text" name="title">
+        <br>
+        <label for="idescription">Descrição: </label>
+        <textarea name="description" id="Description"></textarea>
+        <br>
+        <label for="itime">time: </label>
+        <input type="date" id="date" name="date">
+        <br>
+        <label for="istatus">Status: </label>
+        <select name="status" id="status">
+            {% for value, display_name in status_choices %}
+                <option value="{{ value }}">{{ display_name }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Enviar</button>
+        
+    </form>
+    <script src="{% static 'view_all_tasks/view_all_tasks.js' %}" defer></script>
+</body>
+</html>
