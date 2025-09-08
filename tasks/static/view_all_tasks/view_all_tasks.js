@@ -5,103 +5,175 @@
   }
   const csrftoken = getCookie('csrftoken');
 
-baseURL = `http://127.0.0.1:8000/api`
+const baseURL = `http://127.0.0.1:8000/api`;
+let allTasks = []; // Armazenar todas as tarefas localmente
 
 
+// --- Funções de Renderização ---
 
-async function get_tasks() { 
-    try {
-        const response = await fetch(`${baseURL}/`);
-        if (!response.ok) throw new Error(`Erro: ${response.status}`);
-        const task = await response.json();
-        return task
-    } catch (error) { 
-        console.error("Erro ao buscar todos os posts: ", error.message);
-    }
+function createTaskListItem(task) {
+    const li = document.createElement("li");
+    li.dataset.taskId = task.id; // Adiciona um identificador ao elemento
+    li.innerHTML = `
+            <strong>${task.title}</strong><br>
+            📝 ${task.description}<br>
+            📅 Prazo: ${task.deadline_date}<br>
+            🕒 Criado em: ${new Date(task.creation_date).toLocaleString()}<br>
+            ✅ Status: ${task.status_display}
+            <br>
+        `;
+
+    const btnEditar = document.createElement('button');
+    btnEditar.textContent = "Editar";
+    btnEditar.addEventListener("click", () => criarForm(task, li));
+
+    const btnDelete = document.createElement('button');
+    btnDelete.textContent = "Delete";
+    btnDelete.style.background = 'red';
+    btnDelete.style.color = 'white';
+    btnDelete.addEventListener("click", () => deleteForm(task));
+
+    li.appendChild(btnEditar);
+    li.appendChild(btnDelete);
+    return li;
 }
 
+function renderAllLists() {
+    // Garante que qualquer formulário de edição aberto seja removido antes de redesenhar
+    const existingEditForm = document.querySelector('.form-edit');
+    if (existingEditForm) {
+        existingEditForm.remove();
+    }
 
+    // Filtra pendentes no array de allTasks. Retorna um array.
+    const pendingTasks = allTasks.filter(task => task.status !== 'concluida');
+    console.log(pendingTasks)
+    const completedTasks = allTasks.filter(task => task.status === 'concluida');
 
-async function view_tasks() { 
-    const tasks = await get_tasks()
-    const ul = document.getElementById('listTask')
-    ul.innerHTML = '' // Limpando a lista antes de adicionar
-    tasks.forEach(task => {
-        const li = document.createElement("li");
-        const btnEditar = document.createElement('button')
-        btnEditar.innerHTML = "Editar"
+    // Pegando ul
+    const ulPending = document.getElementById('listTask');
+    ulPending.innerHTML = '';
+    pendingTasks.forEach(task => {
+        // Chamando pra renderizar na tela
+        ulPending.appendChild(createTaskListItem(task));
+    });
+
+    const ulCompleted = document.getElementById('completes');
+    ulCompleted.innerHTML = '';
+    completedTasks.forEach(task => {
+        const li = document.createElement('li');
+        li.dataset.taskId = task.id;
         li.innerHTML = `
             <strong>${task.title}</strong><br>
             📝 ${task.description}<br>
             📅 Prazo: ${task.deadline_date}<br>
             🕒 Criado em: ${new Date(task.creation_date).toLocaleString()}<br>
             ✅ Status: ${task.status_display}
-        `; 
-        ul.appendChild(li)
-        ul.appendChild(btnEditar)
-        btnEditar.addEventListener("click", (event)=> { 
-            criarForm(task, event.target)
-        })
+        `;
+        ulCompleted.appendChild(li);
     });
 }
-view_tasks();
 
-async function createTask(formData) { 
-    try { 
-        const response = await fetch(`${baseURL}/`, { 
+// --- Requisições à API ---
+
+// Fazendo requisição para retornar tudo: Tarefas concluidas, tarefas pendente... Vai me retornar tudo, literalmente.
+async function fetchAllTasks() {
+    try {
+        const response = await fetch(`${baseURL}/`);
+        if (!response.ok) throw new Error(`Erro: ${response.status}`);
+        allTasks = await response.json(); // Fazendo o allTasks receber o json retornado do response.
+        renderAllLists();
+    } catch (error) {
+        console.error("Erro ao buscar todos os posts: ", error.message);
+    }
+}
+
+async function createTask(formData) {
+    try {
+        const response = await fetch(`${baseURL}/`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 "Content-Type": "application/json",
                 "X-CSRFToken": csrftoken,
             },
-            body:JSON.stringify(Object.fromEntries(formData)), // Convertendo em json os dados passados no formData
+            body: JSON.stringify(Object.fromEntries(formData)),
         })
-        if (!response.ok) { 
+        if (!response.ok) {
             const data = await response.json();
-            console.log("Resposta: ", data)
-        } else { 
-            view_tasks(); // Aqui eu queria recarregar a lista adicionando a nova tarefa
+            console.error("Erro ao criar tarefa: ", data);
+        } else {
+            const newTask = await response.json(); // Pegando a nova tarefa.
+            allTasks.push(newTask); // Atualiza o estado local
+            renderAllLists(); // Redesenha as listas
         }
-         
-        
-    } catch(error) { 
+    } catch (error) {
         console.error("Erro")
     }
 }
-
-async function editTask(task, dados) { 
-    try { 
-        console.log("dados: ",dados)
-        const res = await fetch(`${baseURL}/${task.id}/`, { 
-            method: "PUT", 
-            headers: { 
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrftoken,
-            },
-            body: JSON.stringify(dados),
-        })
-        if (!res.ok) { 
-            const data = await response.json();
-            console.log("Resposta: ", data);
-        }else { 
-            view_tasks();
-        }
-    }  catch(error) { 
-        console.error("Erro")
-    }
-    
-    
-
-}
-
-
 
 const form = document.getElementById("adicionarTarefa");
 form.addEventListener("submit", async function(event){ 
     event.preventDefault()
     const formData = new FormData(form);
-    createTask(formData) 
+    await createTask(formData);
+    form.reset();
 })
+
+async function editTask(task, dados) {
+    try {
+        const res = await fetch(`${baseURL}/${task.id}/`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken,
+            },
+            body: JSON.stringify(dados),
+        })
+        if (!res.ok) {
+            const data = await res.json();
+            console.error("Erro ao editar: ", data);
+        } else {
+            // 1. Pega a tarefa atualizada que o servidor enviou de volta
+            const updatedTask = await res.json();
+
+            // 2. Encontra a posição (o "índice") da tarefa antiga no nosso array local
+            const index = allTasks.findIndex(t => t.id === updatedTask.id);
+
+            // 3. Se a tarefa foi encontrada no array...
+            if (index !== -1) {
+                // 4. ...substitui a tarefa antiga pela nova, já com os dados atualizados.
+                allTasks[index] = updatedTask;
+            }
+
+            // 5. Manda redesenhar todas as listas na tela com os dados mais recentes.
+            renderAllLists();
+        }
+    } catch (error) {
+        console.error("Erro")
+    }
+}
+
+async function deleteForm(task) {
+    try {
+        const res = await fetch(`${baseURL}/${task.id}/`, {
+            method: "DELETE",
+            headers: { "X-CSRFToken": csrftoken }
+        });
+
+        if (res.ok) {
+            // Remove a tarefa do array local
+            allTasks = allTasks.filter(t => t.id !== task.id);
+            renderAllLists();
+        } else {
+            alert("Deu erro ao deletar contato!")
+        }
+    } catch (error) {
+        console.error("Erro ao deletar: ", error);
+        alert("Ocorreu um erro de rede ao tentar deletar a tarefa.");
+    }
+}
+
+// --- Funções de UI ---
 
 function criarSelectedStatus(opcoes, valorAtual) { 
         const select = document.createElement('select');
@@ -118,11 +190,9 @@ function criarSelectedStatus(opcoes, valorAtual) {
         });
     
         return select;
-    
 }
 
-function criarForm(task, botaoClicado) { 
-    const itemPai = botaoClicado.parentElement;
+function criarForm(task, listItem) {
     const divFormulario = document.createElement('div');
     divFormulario.className = 'form-edit';
     const divExistente = document.querySelector('.form-edit');
@@ -136,13 +206,14 @@ function criarForm(task, botaoClicado) {
 
     if (divExistente) { 
         alert("Por favor, feche ou salve o contato que já está sendo editado!");
+        return;
     }
 
     divFormulario.innerHTML = `
         <form action="."  method="PUT" id="formEdicao">
             <input type="text" name="title" value="${task.title}">
             <textarea name="description">${task.description}</textarea>
-            <input type="date" name="date" value="${task.deadline_date}">
+            <input type="date" name="deadline_date" value="${task.deadline_date}">
         </form>
     `
 
@@ -154,17 +225,18 @@ function criarForm(task, botaoClicado) {
     btnSave.textContent = 'Salvar';
     divFormulario.querySelector('form').appendChild(btnSave);
 
-    itemPai.appendChild(divFormulario);
+    listItem.appendChild(divFormulario);
 
     const formEdicao = document.getElementById('formEdicao');
-    console.log(formEdicao)
     formEdicao.addEventListener('submit', async function(event){ 
         event.preventDefault();
         const formData = new FormData(formEdicao);
         const dados = Object.fromEntries(formData.entries());
-        console.log(task.id)
-        editTask(task, dados);
+        // A função editTask vai chamar renderAllLists, que por sua vez removerá o formulário.
+        await editTask(task, dados);
     })
 }
 
-  
+
+// --- Inicialização ---
+document.addEventListener('DOMContentLoaded', fetchAllTasks);

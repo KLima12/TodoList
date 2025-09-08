@@ -33,6 +33,13 @@ class TaskDetailApiView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'id'  # Informa ao DRF para usar o 'id' da URL para buscar o objeto
 
 
+@api_view(['GET'])
+def tasks_complete(request):
+    task = Task.objects.filter(status="concluida")
+    serializer = TaskSerialiser(task, many=True)
+    return Response(serializer.data)
+
+
 def view_tasks(request):
     task = Task.objects.all()
     context = {
