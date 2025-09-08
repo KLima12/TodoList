@@ -24,6 +24,15 @@ class TaskListApiView(generics.ListCreateAPIView):
     serializer_class = TaskSerialiser
 
 
+class TaskDetailApiView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API View para buscar (GET), atualizar (PUT/PATCH) ou deletar (DELETE) uma tarefa específica.
+    """
+    queryset = Task.objects.all()
+    serializer_class = TaskSerialiser
+    lookup_field = 'id'  # Informa ao DRF para usar o 'id' da URL para buscar o objeto
+
+
 def view_tasks(request):
     task = Task.objects.all()
     context = {
